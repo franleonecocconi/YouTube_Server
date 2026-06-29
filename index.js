@@ -1,4 +1,4 @@
-// index.js - Versión con API Key Incluida
+// index.js - Versión Web Blindada
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -7,31 +7,30 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// La API Key oficial que necesita InnerTube para no tirar 403
-const API_KEY = "?key=AIzaSyAO_2Tk6996D76v_1S9NOfZbyN_9D8pP4M";
+// API Key oficial que usa la versión Web de YouTube
+const API_KEY = "?key=AIzaSyAunp6-B2RXYLdtYp528A6Mv458fP_7-A0";
 
 const GOOGLE_HEADERS = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Watch5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 YouTubeAndroidEmbeddedPlayer/19.25.33V',
-    'X-Youtube-Client-Name': '55',
-    'X-Youtube-Client-Version': '19.25.33',
-    'X-Goog-Api-Format-Version': '2',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'X-Youtube-Client-Name': '1', // 1 significa cliente WEB
+    'X-Youtube-Client-Version': '2.20260626.01.00',
     'Origin': 'https://www.youtube.com',
+    'Referer': 'https://www.youtube.com/',
     'Accept-Language': 'es-419,es;q=0.9'
 };
 
 app.get('/', (req, res) => {
-    res.send('YouTube corre ahora');
+    res.send('El servidor proxy de YouTube esta corriendo');
 });
 
 app.post('/api/browse', async (req, res) => {
     console.log('--> Petición de Inicio (Browse)');
     try {
-        // Le sumamos la API_KEY al final de la URL de Google
         const response = await axios.post(`https://youtubei.googleapis.com/v1/browse${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
-        console.error('Error en Browse:', error.message);
+        console.error('Error en Browse:', error.response?.data || error.message);
         res.status(error.response?.status || 500).json({ error: error.message });
     }
 });
@@ -42,7 +41,7 @@ app.post('/api/search', async (req, res) => {
         const response = await axios.post(`https://youtubei.googleapis.com/v1/search${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
-        console.error('Error en Search:', error.message);
+        console.error('Error en Search:', error.response?.data || error.message);
         res.status(error.response?.status || 500).json({ error: error.message });
     }
 });
@@ -53,11 +52,11 @@ app.post('/api/next', async (req, res) => {
         const response = await axios.post(`https://youtubei.googleapis.com/v1/next${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
-        console.error('Error en Next:', error.message);
+        console.error('Error en Next:', error.response?.data || error.message);
         res.status(error.response?.status || 500).json({ error: error.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`YouTube corriendo en el puerto ${PORT}`);
+    console.log(`😈 Servidor corriendo con cliente WEB en el puerto ${PORT}`);
 });
