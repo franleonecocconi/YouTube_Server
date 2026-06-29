@@ -1,4 +1,4 @@
-// index.js
+// index.js - Versión con API Key Incluida
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -6,6 +6,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// La API Key oficial que necesita InnerTube para no tirar 403
+const API_KEY = "?key=AIzaSyAO_2Tk6996D76v_1S9NOfZbyN_9D8pP4M";
 
 const GOOGLE_HEADERS = {
     'Content-Type': 'application/json',
@@ -18,13 +21,14 @@ const GOOGLE_HEADERS = {
 };
 
 app.get('/', (req, res) => {
-    res.send('YouTube esta corriendo');
+    res.send('YouTube corre ahora');
 });
 
 app.post('/api/browse', async (req, res) => {
     console.log('--> Petición de Inicio (Browse)');
     try {
-        const response = await axios.post('https://youtubei.googleapis.com/v1/browse', req.body, { headers: GOOGLE_HEADERS });
+        // Le sumamos la API_KEY al final de la URL de Google
+        const response = await axios.post(`https://youtubei.googleapis.com/v1/browse${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
         console.error('Error en Browse:', error.message);
@@ -35,7 +39,7 @@ app.post('/api/browse', async (req, res) => {
 app.post('/api/search', async (req, res) => {
     console.log('--> Petición de Búsqueda (Search)');
     try {
-        const response = await axios.post('https://youtubei.googleapis.com/v1/search', req.body, { headers: GOOGLE_HEADERS });
+        const response = await axios.post(`https://youtubei.googleapis.com/v1/search${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
         console.error('Error en Search:', error.message);
@@ -46,7 +50,7 @@ app.post('/api/search', async (req, res) => {
 app.post('/api/next', async (req, res) => {
     console.log('--> Petición de Siguiente (Next)');
     try {
-        const response = await axios.post('https://youtubei.googleapis.com/v1/next', req.body, { headers: GOOGLE_HEADERS });
+        const response = await axios.post(`https://youtubei.googleapis.com/v1/next${API_KEY}`, req.body, { headers: GOOGLE_HEADERS });
         res.json(response.data);
     } catch (error) {
         console.error('Error en Next:', error.message);
@@ -55,5 +59,5 @@ app.post('/api/next', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`😈 Servidor corriendo en el puerto ${PORT}`);
+    console.log(`YouTube corriendo en el puerto ${PORT}`);
 });
