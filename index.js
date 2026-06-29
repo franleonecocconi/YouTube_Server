@@ -1,4 +1,4 @@
-// index.js - Versión Corregida y Asegurada
+// index.js
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -17,12 +17,10 @@ const GOOGLE_HEADERS = {
     'Accept-Language': 'es-419,es;q=0.9'
 };
 
-// RUTA DE PRUEBA EN LA RAÍZ: Para ver desde la Mac si el servidor está vivo
 app.get('/', (req, res) => {
-    res.send('¡El servidor proxy de YouTube está vivito y coleando, buey!');
+    res.send('YouTube esta corriendo');
 });
 
-// 1. RUTA PARA BROWSE
 app.post('/api/browse', async (req, res) => {
     console.log('--> Petición de Inicio (Browse)');
     try {
@@ -34,7 +32,6 @@ app.post('/api/browse', async (req, res) => {
     }
 });
 
-// 2. RUTA PARA SEARCH
 app.post('/api/search', async (req, res) => {
     console.log('--> Petición de Búsqueda (Search)');
     try {
@@ -46,7 +43,6 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// 3. RUTA PARA NEXT
 app.post('/api/next', async (req, res) => {
     console.log('--> Petición de Siguiente (Next)');
     try {
