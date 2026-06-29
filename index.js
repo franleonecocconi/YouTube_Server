@@ -1,4 +1,4 @@
-// index.js - Versión de sincronización de identidad total
+// index.js - Versión TVHTML5 anti-CAPTCHA
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -7,39 +7,40 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// API Key oficial para el cliente Web
-const API_KEY = "?key=AIzaSyAunp6-B2RXYLdtYp528A6Mv458fP_7-A0";
+// API Key oficial que usan las Smart TVs y Consolas para YouTube
+const API_KEY = "?key=AIzaSyAt9w0768SgSpI87y0D1f8Z313G2D4I4A0";
 
 const GOOGLE_HEADERS = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    'X-Youtube-Client-Name': '1',
-    'X-Youtube-Client-Version': '2.20260626.01.00',
+    'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 SmartTV',
     'Origin': 'https://www.youtube.com',
-    'Referer': 'https://www.youtube.com/',
+    'Referer': 'https://www.youtube.com/tv',
     'Accept-Language': 'es-419,es;q=0.9'
 };
 
-// Función auxiliar para reescribir el cuerpo y evitar discrepancias de identidad
+// Modificamos el cuerpo para que Google piense que es una televisión pidiendo videos
 function fixRequestBody(body) {
     const updatedBody = { ...body };
-    if (updatedBody.context && updatedBody.context.client) {
-        updatedBody.context.client = {
-            clientName: "WEB",
-            clientVersion: "2.20260626.01.00",
-            hl: body.context.client.hl || "es-419",
-            gl: body.context.client.gl || "AR"
-        };
-    }
+    updatedBody.context = {
+        client: {
+            clientName: "TVHTML5",
+            clientVersion: "7.20260620.00.00",
+            hl: "es-419",
+            gl: "AR",
+            userAgent: "Mozilla/5.0 (ChromiumStylePlatform; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 SmartTV,gzip(gfe)"
+        },
+        user: { lockedSafetyMode: false },
+        request: { useSsl: true }
+    };
     return updatedBody;
 }
 
 app.get('/', (req, res) => {
-    res.send('El servidor proxy de YouTube está corriendo ⚡️');
+    res.send('El servidor corre perfectamente');
 });
 
 app.post('/api/browse', async (req, res) => {
-    console.log('--> Petición de Inicio (Browse)');
+    console.log('--> Petición de Inicio (Browse - TV Mode)');
     try {
         const cleanBody = fixRequestBody(req.body);
         const response = await axios.post(`https://youtubei.googleapis.com/v1/browse${API_KEY}`, cleanBody, { headers: GOOGLE_HEADERS });
@@ -51,7 +52,7 @@ app.post('/api/browse', async (req, res) => {
 });
 
 app.post('/api/search', async (req, res) => {
-    console.log('--> Petición de Búsqueda (Search)');
+    console.log('--> Petición de Búsqueda (Search - TV Mode)');
     try {
         const cleanBody = fixRequestBody(req.body);
         const response = await axios.post(`https://youtubei.googleapis.com/v1/search${API_KEY}`, cleanBody, { headers: GOOGLE_HEADERS });
@@ -63,7 +64,7 @@ app.post('/api/search', async (req, res) => {
 });
 
 app.post('/api/next', async (req, res) => {
-    console.log('--> Petición de Siguiente (Next)');
+    console.log('--> Petición de Siguiente (Next - TV Mode)');
     try {
         const cleanBody = fixRequestBody(req.body);
         const response = await axios.post(`https://youtubei.googleapis.com/v1/next${API_KEY}`, cleanBody, { headers: GOOGLE_HEADERS });
@@ -75,5 +76,5 @@ app.post('/api/next', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`😈 Servidor corriendo con normalización de identidad en el puerto ${PORT}`);
+    console.log(`😈 Servidor corriendo en Modo Smart TV en el puerto ${PORT}`);
 });
