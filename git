@@ -1,4 +1,8 @@
 #!/bin/bash
+echo "Subiendo código a GitHub..."
 git add .
 git commit -m "GitHub Actions Script"
 git push origin main
+
+echo "⚡ Desplegando proxy en Cloudflare Workers..."
+wrangler deploy
