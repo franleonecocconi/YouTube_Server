@@ -44,7 +44,7 @@ export default {
 
         // 1. RUTA RAÍZ (Para ver si está vivo en el navegador)
         if (url.pathname === '/' && request.method === 'GET') {
-            return new Response('¡El proxy intergaláctico de Cloudflare está corriendo, buey!', {
+            return new Response('YouTube corre perfectamente', {
                 headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders }
             });
         }
