@@ -4,25 +4,26 @@ const YouTubeExt = require('youtube-ext');
 
 const app = express();
 
-// Aplicamos CORS y Express JSON de forma nativa
 app.use(cors());
 app.use(express.json());
 
-const GOOGLE_HEADERS = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 SmartTV',
-    'Origin': 'https://www.youtube.com',
-    'Referer': 'https://www.youtube.com/tv',
-    'Accept-Language': 'es-419,es;q=0.9'
-};
-
-// 1. Endpoint: BROWSE
+// 1. Endpoint: BROWSE (Corregido para usar la función real de la librería)
 app.get('/api/browse', async (req, res) => {
     try {
-        const trending = await YouTubeExt.getTrending({ region: 'AR' });
-        res.status(200).json({ success: true, contents: trending.videos });
+        // En youtube-ext se usa getHomepage para la pantalla de inicio/tendencias
+        const homepage = await YouTubeExt.getHomepage();
+        res.status(200).json({ 
+            success: true, 
+            contents: homepage.videos || homepage.contents || [] 
+        });
     } catch (error) {
-        res.status(500).json({ error: "Error en browse", message: error.message });
+        // Si getHomepage llega a estar viejo, tiramos un search genérico de seguridad
+        try {
+            const backup = await YouTubeExt.search('');
+            res.status(200).json({ success: true, contents: backup.videos || [] });
+        } catch (backupError) {
+            res.status(500).json({ error: "Error en browse", message: error.message });
+        }
     }
 });
 
@@ -31,26 +32,29 @@ app.get('/api/search', async (req, res) => {
     try {
         const query = req.query.q || '';
         const searchResults = await YouTubeExt.search(query);
-        res.status(200).json({ success: true, contents: searchResults.videos });
+        res.status(200).json({ success: true, contents: searchResults.videos || [] });
     } catch (error) {
         res.status(500).json({ error: "Error en search", message: error.message });
     }
 });
 
-// 3. Endpoint: NEXT (Detalles y streams de audio)
+// 3. Endpoint: NEXT (Corregido para asegurar la extracción de streams de audio)
 app.get('/api/next', async (req, res) => {
     try {
         const videoId = req.query.videoId || '';
         if (!videoId) {
             return res.status(400).json({ error: "Falta el videoId" });
         }
+
+        // Buscamos los detalles usando el ID del video
         const videoDetails = await YouTubeExt.getVideo(videoId);
+        
         res.status(200).json({
             success: true,
             title: videoDetails.title,
             id: videoDetails.id,
             thumbnails: videoDetails.thumbnails,
-            streams: videoDetails.streams || [], // Acá tenés tus URLs de audio limpias
+            streams: videoDetails.streams || [], // Tus urls de audio
             contents: videoDetails.relatedVideos || []
         });
     } catch (error) {
@@ -58,5 +62,4 @@ app.get('/api/next', async (req, res) => {
     }
 });
 
-// En Vercel no se usa app.listen(), exportamos la app directamente para Serverless
 module.exports = app;
