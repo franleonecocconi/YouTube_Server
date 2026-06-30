@@ -51,18 +51,22 @@ const formatGridContents = (items, isShorts = false) => {
         });
 };
 
-// 1. Endpoint: BROWSE (Corregidos los cierres en la línea 82)
+// 1. Endpoint: BROWSE (Con salvavidas antibloqueo)
 const handleBrowse = async (req, res) => {
     try {
         let combinedItems = [];
-        const fallbacks = ["musica", "tendencias", "exitos"];
+        const terms = ["musica", "tendencias", "videoclips", "songs"];
         
-        for (const word of fallbacks) {
-            const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 15);
-            if (resApi && resApi.items) {
-                combinedItems = combinedItems.concat(resApi.items);
+        for (const word of terms) {
+            try {
+                const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 20);
+                if (resApi && resApi.items && resApi.items.length > 0) {
+                    combinedItems = combinedItems.concat(resApi.items);
+                }
+            } catch (e) {
+                // Si falla una palabra, sigue a la otra silenciosamente
             }
-            if (combinedItems.length >= 30) break; 
+            if (combinedItems.length >= 20) break; 
         }
 
         const contentsArray = formatGridContents(combinedItems, false);
@@ -73,9 +77,7 @@ const handleBrowse = async (req, res) => {
                     tabs: [{
                         tabRenderer: {
                             content: { 
-                                richGridRenderer: { 
-                                    contents: contentsArray 
-                                } 
+                                richGridRenderer: { contents: contentsArray } 
                             }
                         }
                     }]
@@ -92,18 +94,24 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SHORTS (Corregidos los cierres en la línea 119)
+// 2. Endpoint: SHORTS (A prueba de balas contra el array vacío)
 const handleShorts = async (req, res) => {
     try {
         let combinedItems = [];
-        const keywords = ["shorts musica", "shorts trend", "viral shorts"];
+        // Lista de palabras ultra genéricas que devuelven shorts sí o sí
+        const shortsTerms = ["shorts", "funny shorts", "trending shorts", "viral", "tiktok trend"];
 
-        for (const word of keywords) {
-            const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 15);
-            if (resApi && resApi.items) {
-                combinedItems = combinedItems.concat(resApi.items);
+        for (const word of shortsTerms) {
+            try {
+                const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 20);
+                if (resApi && resApi.items && resApi.items.length > 0) {
+                    combinedItems = combinedItems.concat(resApi.items);
+                }
+            } catch (e) {
+                // Salvavidas si YouTube bloquea la query
             }
-            if (combinedItems.length >= 30) break;
+            // Cortamos el bucle si ya juntamos una buena cantidad para el reloj
+            if (combinedItems.length >= 20) break;
         }
 
         const contentsArray = formatGridContents(combinedItems, true);
@@ -114,9 +122,7 @@ const handleShorts = async (req, res) => {
                     tabs: [{
                         tabRenderer: {
                             content: { 
-                                richGridRenderer: { 
-                                    contents: contentsArray 
-                                } 
+                                richGridRenderer: { contents: contentsArray } 
                             }
                         }
                     }]
