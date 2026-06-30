@@ -14,30 +14,46 @@ app.post('/', handleStatus);
 app.get('/api', handleStatus);
 app.post('/api', handleStatus);
 
-// 1. Endpoint: BROWSE (Soporta el POST del reloj y estructura InnerTube de YouTube)
-const handleBrowse = async (req, res) => {
-    try {
-        // Traemos los videos usando la API de Smart TV interna
-        const results = await youTubeSearchApi.GetListByKeyword("musica tendencias", false, 40);
-        
-        // Mapeamos los items al formato de renderizado que busca la app nativa de YouTube
-        const contentsArray = (results.items || []).map(v => ({
+// Helper para estructurar las respuestas consistentes con el parser nativo de la app
+const formatGridContents = (items, isShorts = false) => {
+    return (items || []).map(v => {
+        const videoId = v.id || '';
+        const defaultThumb = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+        return {
             richItemRenderer: {
                 content: {
                     videoRenderer: {
-                        videoId: v.id || '',
+                        videoId: videoId,
                         thumbnail: {
-                            thumbnails: [{ url: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` }]
+                            thumbnails: [
+                                { url: v.thumbnail?.thumbnails?.[0]?.url || defaultThumb, width: 360, height: 202 }
+                            ]
                         },
-                        title: { runs: [{ text: v.title || 'Video sin título' }] },
+                        title: { runs: [{ text: v.title || (isShorts ? 'Short sin título' : 'Video sin título') }] },
                         longBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] },
-                        shortBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] }
+                        shortBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] },
+                        lengthText: { runs: [{ text: isShorts ? "Short" : "4:30" }] }
                     }
                 }
             }
-        }));
+        };
+    });
+};
 
-        // Estructura oficial InnerTube que evita el error de parseo en Android
+// 1. Endpoint: BROWSE (Videos con Scroll Infinito de a 20)
+const handleBrowse = async (req, res) => {
+    try {
+        // Capturamos la página actual enviada por la app (por query o body del POST)
+        const page = parseInt(req.query.page || req.body?.page || '1');
+        
+        // Lista rotativa de keywords para simular feeds infinitos reales
+        const feedKeywords = ["musica tendencias", "lo mas escuchado 2026", "exitos argentina", "pop urbano"];
+        const selectedKeyword = feedKeywords[(page - 1) % feedKeywords.length];
+
+        // Traemos bloques fijos de 20 elementos por cada scroll
+        const results = await youTubeSearchApi.GetListByKeyword(selectedKeyword, false, 20);
+        const contentsArray = formatGridContents(results.items || [], false);
+
         const nativeYouTubeResponse = {
             contents: {
                 twoColumnBrowseResultsRenderer: {
@@ -52,12 +68,13 @@ const handleBrowse = async (req, res) => {
                     }]
                 }
             },
+            nextPage: page + 1,
             success: true
         };
 
         return res.status(200).json(nativeYouTubeResponse);
     } catch (error) {
-        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
+        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, nextPage: 1, success: true });
     }
 };
 app.get('/browse', handleBrowse);
@@ -65,9 +82,48 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SEARCH (Adaptado también al formato nativo de listas)
+// 2. Endpoint: SHORTS (Nuevo endpoint para scroll infinito vertical de Shorts)
+const handleShorts = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page || req.body?.page || '1');
+        
+        // Keywords orientadas a forzar contenido en formato vertical corto
+        const shortsKeywords = ["#shorts musica", "#shorts tendencias", "#shorts virales", "#shorts canciones"];
+        const selectedKeyword = shortsKeywords[(page - 1) % shortsKeywords.length];
+
+        const results = await youTubeSearchApi.GetListByKeyword(selectedKeyword, false, 20);
+        const contentsArray = formatGridContents(results.items || [], true);
+
+        const nativeShortsResponse = {
+            contents: {
+                twoColumnBrowseResultsRenderer: {
+                    tabs: [{
+                        tabRenderer: {
+                            content: {
+                                richGridRenderer: {
+                                    contents: contentsArray
+                                }
+                            }
+                        }
+                    }]
+                }
+            },
+            nextPage: page + 1,
+            success: true
+        };
+
+        return res.status(200).json(nativeShortsResponse);
+    } catch (error) {
+        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, nextPage: 1, success: true });
+    }
+};
+app.get('/shorts', handleShorts);
+app.post('/shorts', handleShorts);
+app.get('/api/shorts', handleShorts);
+app.post('/api/shorts', handleShorts);
+
+// 3. Endpoint: SEARCH
 const handleSearch = async (req, res) => {
-    // Tomamos la query ya sea por URL (?q=) o por el cuerpo del POST si lo manda la app
     const query = req.query.q || req.body?.query || 'musica';
     try {
         const results = await youTubeSearchApi.GetListByKeyword(query, false, 20);
@@ -102,7 +158,7 @@ app.post('/search', handleSearch);
 app.get('/api/search', handleSearch);
 app.post('/api/search', handleSearch);
 
-// 3. Endpoint: NEXT
+// 4. Endpoint: NEXT
 const handleNext = async (req, res) => {
     const videoId = req.query.videoId || req.body?.videoId || '';
     if (!videoId) return res.status(400).json({ error: "Falta el videoId" });
