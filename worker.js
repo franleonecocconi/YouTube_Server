@@ -8,14 +8,14 @@ app.use(cors());
 app.use(express.json());
 
 // Control base para verificar en la web si el server responde
-app.get('/', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" }));
-app.get('/api', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" }));
+app.get('/', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado" }));
+app.get('/api', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado" }));
 
 // 1. Endpoint: BROWSE (Corregido usando el método nativo real)
 const handleBrowse = async (req, res) => {
     try {
         // Usamos GetListByKeyword con una búsqueda genérica potente para armar el inicio
-        const results = await youTubeSearchApi.GetListByKeyword("musica tendencias", false, 15);
+        const results = await youTubeSearchApi.GetListByKeyword("musica tendencias", false, 100);
         
         const safeContents = (results.items || []).map(v => ({
             id: v.id || '',
