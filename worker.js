@@ -51,13 +51,11 @@ const formatGridContents = (items, isShorts = false) => {
         });
 };
 
-// 1. Endpoint: BROWSE (Videos Recomendados de YouTube de a 20 con Scroll Infinito)
+// 1. Endpoint: BROWSE (Carga masiva de 100 videos recomendados mezclados)
 const handleBrowse = async (req, res) => {
     try {
-        const page = parseInt(req.query.page || req.body?.page || '1');
-
-        // Pasamos un string vacío para que traiga la página principal recomendada de YouTube pura
-        const results = await youTubeSearchApi.GetListByKeyword("", false, 20);
+        // Usamos un operador pipe '|' de YouTube para traer un popurrí gigante de tendencias sin fijar un solo tema
+        const results = await youTubeSearchApi.GetListByKeyword("music|trending|songs|videos", false, 100);
         const contentsArray = formatGridContents(results.items || [], false);
 
         const nativeYouTubeResponse = {
@@ -74,13 +72,12 @@ const handleBrowse = async (req, res) => {
                     }]
                 }
             },
-            nextPage: page + 1,
             success: true
         };
 
         return res.status(200).json(nativeYouTubeResponse);
     } catch (error) {
-        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, nextPage: 1, success: true });
+        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
 };
 app.get('/browse', handleBrowse);
@@ -88,13 +85,11 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SHORTS (Recomendaciones de Shorts nativas con Scroll Infinito)
+// 2. Endpoint: SHORTS (Carga masiva de Shorts usando query compuesta obligatoria)
 const handleShorts = async (req, res) => {
     try {
-        const page = parseInt(req.query.page || req.body?.page || '1');
-
-        // Mandamos solo la etiqueta general para que la API levante lo recomendado del feed vertical
-        const results = await youTubeSearchApi.GetListByKeyword("#shorts", false, 20);
+        // Al buscar "shorts|trending" la librería sí encuentra los patrones estructurales correctos
+        const results = await youTubeSearchApi.GetListByKeyword("shorts|trending|viral", false, 100);
         const contentsArray = formatGridContents(results.items || [], true);
 
         const nativeShortsResponse = {
@@ -111,13 +106,12 @@ const handleShorts = async (req, res) => {
                     }]
                 }
             },
-            nextPage: page + 1,
             success: true
         };
 
         return res.status(200).json(nativeShortsResponse);
     } catch (error) {
-        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, nextPage: 1, success: true });
+        return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
 };
 app.get('/shorts', handleShorts);
@@ -125,11 +119,11 @@ app.post('/shorts', handleShorts);
 app.get('/api/shorts', handleShorts);
 app.post('/api/shorts', handleShorts);
 
-// 3. Endpoint: SEARCH (Búsqueda Real limpia sin fallbacks predefinidos)
+// 3. Endpoint: SEARCH
 const handleSearch = async (req, res) => {
-    const query = req.query.q || req.body?.query || '';
+    const query = req.query.q || req.body?.query || 'musica';
     try {
-        const results = await youTubeSearchApi.GetListByKeyword(query, false, 20);
+        const results = await youTubeSearchApi.GetListByKeyword(query, false, 40);
         
         const nativeSearchResponse = {
             contents: {
