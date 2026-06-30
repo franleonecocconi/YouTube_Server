@@ -14,44 +14,50 @@ app.post('/', handleStatus);
 app.get('/api', handleStatus);
 app.post('/api', handleStatus);
 
-// Helper para estructurar las respuestas consistentes con el parser nativo de la app
+// Helper seguro para mapear elementos tanto de videos comunes como de shorts
 const formatGridContents = (items, isShorts = false) => {
-    return (items || []).map(v => {
-        const videoId = v.id || '';
-        const defaultThumb = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-        return {
-            richItemRenderer: {
-                content: {
-                    videoRenderer: {
-                        videoId: videoId,
-                        thumbnail: {
-                            thumbnails: [
-                                { url: v.thumbnail?.thumbnails?.[0]?.url || defaultThumb, width: 360, height: 202 }
-                            ]
-                        },
-                        title: { runs: [{ text: v.title || (isShorts ? 'Short sin título' : 'Video sin título') }] },
-                        longBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] },
-                        shortBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] },
-                        lengthText: { runs: [{ text: isShorts ? "Short" : "4:30" }] }
+    return (items || [])
+        .filter(v => v && (v.id || v.videoId))
+        .map(v => {
+            const videoId = v.id || v.videoId || '';
+            const titleText = v.title || (isShorts ? 'Short vertical' : 'Video sin título');
+            const channelText = v.channelTitle || v.author || 'Canal';
+            
+            let imgUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+            if (v.thumbnail?.thumbnails?.[0]?.url) {
+                imgUrl = v.thumbnail.thumbnails[0].url;
+            } else if (v.thumbnails?.[0]?.url) {
+                imgUrl = v.thumbnails[0].url;
+            }
+
+            return {
+                richItemRenderer: {
+                    content: {
+                        videoRenderer: {
+                            videoId: videoId,
+                            thumbnail: {
+                                thumbnails: [
+                                    { url: imgUrl, width: 360, height: 202 }
+                                ]
+                            },
+                            title: { runs: [{ text: titleText }] },
+                            longBylineText: { runs: [{ text: channelText }] },
+                            shortBylineText: { runs: [{ text: channelText }] },
+                            lengthText: { runs: [{ text: isShorts ? "Short" : "4:30" }] }
+                        }
                     }
                 }
-            }
-        };
-    });
+            };
+        });
 };
 
-// 1. Endpoint: BROWSE (Videos con Scroll Infinito de a 20)
+// 1. Endpoint: BROWSE (Videos Recomendados de YouTube de a 20 con Scroll Infinito)
 const handleBrowse = async (req, res) => {
     try {
-        // Capturamos la página actual enviada por la app (por query o body del POST)
         const page = parseInt(req.query.page || req.body?.page || '1');
-        
-        // Lista rotativa de keywords para simular feeds infinitos reales
-        const feedKeywords = ["musica tendencias", "lo mas escuchado 2026", "exitos argentina", "pop urbano"];
-        const selectedKeyword = feedKeywords[(page - 1) % feedKeywords.length];
 
-        // Traemos bloques fijos de 20 elementos por cada scroll
-        const results = await youTubeSearchApi.GetListByKeyword(selectedKeyword, false, 20);
+        // Pasamos un string vacío para que traiga la página principal recomendada de YouTube pura
+        const results = await youTubeSearchApi.GetListByKeyword("", false, 20);
         const contentsArray = formatGridContents(results.items || [], false);
 
         const nativeYouTubeResponse = {
@@ -82,16 +88,13 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SHORTS (Nuevo endpoint para scroll infinito vertical de Shorts)
+// 2. Endpoint: SHORTS (Recomendaciones de Shorts nativas con Scroll Infinito)
 const handleShorts = async (req, res) => {
     try {
         const page = parseInt(req.query.page || req.body?.page || '1');
-        
-        // Keywords orientadas a forzar contenido en formato vertical corto
-        const shortsKeywords = ["#shorts musica", "#shorts tendencias", "#shorts virales", "#shorts canciones"];
-        const selectedKeyword = shortsKeywords[(page - 1) % shortsKeywords.length];
 
-        const results = await youTubeSearchApi.GetListByKeyword(selectedKeyword, false, 20);
+        // Mandamos solo la etiqueta general para que la API levante lo recomendado del feed vertical
+        const results = await youTubeSearchApi.GetListByKeyword("#shorts", false, 20);
         const contentsArray = formatGridContents(results.items || [], true);
 
         const nativeShortsResponse = {
@@ -122,9 +125,9 @@ app.post('/shorts', handleShorts);
 app.get('/api/shorts', handleShorts);
 app.post('/api/shorts', handleShorts);
 
-// 3. Endpoint: SEARCH
+// 3. Endpoint: SEARCH (Búsqueda Real limpia sin fallbacks predefinidos)
 const handleSearch = async (req, res) => {
-    const query = req.query.q || req.body?.query || 'musica';
+    const query = req.query.q || req.body?.query || '';
     try {
         const results = await youTubeSearchApi.GetListByKeyword(query, false, 20);
         
@@ -135,9 +138,9 @@ const handleSearch = async (req, res) => {
                         itemSectionRenderer: {
                             contents: (results.items || []).map(v => ({
                                 videoRenderer: {
-                                    videoId: v.id || '',
+                                    videoId: v.id || v.videoId || '',
                                     title: { runs: [{ text: v.title || 'Video sin título' }] },
-                                    thumbnail: { thumbnails: [{ url: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` }] },
+                                    thumbnail: { thumbnails: [{ url: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg` }] },
                                     longBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] }
                                 }
                             }))
@@ -168,10 +171,10 @@ const handleNext = async (req, res) => {
         const suggestions = await youTubeSearchApi.GetSuggestVideo(videoId);
 
         const safeContents = (suggestions.items || []).map(v => ({
-            id: v.id || '',
+            id: v.id || v.videoId || '',
             title: v.title || '',
             author: v.channelTitle || '',
-            thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`
+            thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg`
         }));
 
         return res.status(200).json({
