@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Control base para verificar en la web si el server responde
+// Control base
 const handleStatus = (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" });
 app.get('/', handleStatus);
 app.post('/', handleStatus);
@@ -51,31 +51,38 @@ const formatGridContents = (items, isShorts = false) => {
         });
 };
 
-// 1. Endpoint: BROWSE (Carga masiva de 100 videos recomendados mezclados)
+// 1. Endpoint: BROWSE (Corregidos los cierres en la línea 82)
 const handleBrowse = async (req, res) => {
     try {
-        // Usamos un operador pipe '|' de YouTube para traer un popurrí gigante de tendencias sin fijar un solo tema
-        const results = await youTubeSearchApi.GetListByKeyword("music|trending|songs|videos", false, 100);
-        const contentsArray = formatGridContents(results.items || [], false);
+        let combinedItems = [];
+        const fallbacks = ["musica", "tendencias", "exitos"];
+        
+        for (const word of fallbacks) {
+            const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 15);
+            if (resApi && resApi.items) {
+                combinedItems = combinedItems.concat(resApi.items);
+            }
+            if (combinedItems.length >= 30) break; 
+        }
 
-        const nativeYouTubeResponse = {
+        const contentsArray = formatGridContents(combinedItems, false);
+
+        return res.status(200).json({
             contents: {
                 twoColumnBrowseResultsRenderer: {
                     tabs: [{
                         tabRenderer: {
-                            content: {
-                                richGridRenderer: {
-                                    contents: contentsArray
-                                }
+                            content: { 
+                                richGridRenderer: { 
+                                    contents: contentsArray 
+                                } 
                             }
                         }
                     }]
                 }
             },
             success: true
-        };
-
-        return res.status(200).json(nativeYouTubeResponse);
+        });
     } catch (error) {
         return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
@@ -85,31 +92,38 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SHORTS (Carga masiva de Shorts usando query compuesta obligatoria)
+// 2. Endpoint: SHORTS (Corregidos los cierres en la línea 119)
 const handleShorts = async (req, res) => {
     try {
-        // Al buscar "shorts|trending" la librería sí encuentra los patrones estructurales correctos
-        const results = await youTubeSearchApi.GetListByKeyword("shorts|trending|viral", false, 100);
-        const contentsArray = formatGridContents(results.items || [], true);
+        let combinedItems = [];
+        const keywords = ["shorts musica", "shorts trend", "viral shorts"];
 
-        const nativeShortsResponse = {
+        for (const word of keywords) {
+            const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 15);
+            if (resApi && resApi.items) {
+                combinedItems = combinedItems.concat(resApi.items);
+            }
+            if (combinedItems.length >= 30) break;
+        }
+
+        const contentsArray = formatGridContents(combinedItems, true);
+
+        return res.status(200).json({
             contents: {
                 twoColumnBrowseResultsRenderer: {
                     tabs: [{
                         tabRenderer: {
-                            content: {
-                                richGridRenderer: {
-                                    contents: contentsArray
-                                }
+                            content: { 
+                                richGridRenderer: { 
+                                    contents: contentsArray 
+                                } 
                             }
                         }
                     }]
                 }
             },
             success: true
-        };
-
-        return res.status(200).json(nativeShortsResponse);
+        });
     } catch (error) {
         return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
@@ -123,9 +137,8 @@ app.post('/api/shorts', handleShorts);
 const handleSearch = async (req, res) => {
     const query = req.query.q || req.body?.query || 'musica';
     try {
-        const results = await youTubeSearchApi.GetListByKeyword(query, false, 40);
-        
-        const nativeSearchResponse = {
+        const results = await youTubeSearchApi.GetListByKeyword(query, false, 20);
+        return res.status(200).json({
             contents: {
                 sectionListRenderer: {
                     contents: [{
@@ -133,7 +146,7 @@ const handleSearch = async (req, res) => {
                             contents: (results.items || []).map(v => ({
                                 videoRenderer: {
                                     videoId: v.id || v.videoId || '',
-                                    title: { runs: [{ text: v.title || 'Video sin título' }] },
+                                    title: { runs: [{ text: v.title || 'Video' }] },
                                     thumbnail: { thumbnails: [{ url: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg` }] },
                                     longBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] }
                                 }
@@ -143,9 +156,7 @@ const handleSearch = async (req, res) => {
                 }
             },
             success: true
-        };
-
-        return res.status(200).json(nativeSearchResponse);
+        });
     } catch (error) {
         return res.status(200).json({ contents: { sectionListRenderer: { contents: [] } }, success: true });
     }
@@ -163,14 +174,6 @@ const handleNext = async (req, res) => {
     try {
         const details = await youTubeSearchApi.GetVideoDetails(videoId);
         const suggestions = await youTubeSearchApi.GetSuggestVideo(videoId);
-
-        const safeContents = (suggestions.items || []).map(v => ({
-            id: v.id || v.videoId || '',
-            title: v.title || '',
-            author: v.channelTitle || '',
-            thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg`
-        }));
-
         return res.status(200).json({
             success: true,
             title: details.title || 'Video de YouTube',
@@ -178,16 +181,15 @@ const handleNext = async (req, res) => {
             author: details.channelTitle || 'Desconocido',
             thumbnails: [{ url: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` }],
             streams: [{ url: `https://pub-c5e31b5cdafb419a86a69d5d340a9ade.r2.dev/speech_20241229061301297.mp3`, mimeType: "audio/mpeg" }],
-            contents: safeContents
+            contents: (suggestions.items || []).map(v => ({
+                id: v.id || v.videoId || '',
+                title: v.title || '',
+                author: v.channelTitle || '',
+                thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg`
+            }))
         });
     } catch (error) {
-        return res.status(200).json({
-            success: true,
-            title: "Audio de Respaldo",
-            id: videoId,
-            streams: [{ url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", mimeType: "audio/mpeg" }],
-            contents: []
-        });
+        return res.status(200).json({ success: true, title: "Audio de Respaldo", id: videoId, streams: [], contents: [] });
     }
 };
 app.get('/next', handleNext);
