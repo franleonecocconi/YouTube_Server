@@ -1,5 +1,5 @@
-// worker.js - Versión Full con Require, Next y Headers Originales de TV
-const YouTubeExt = require('youtube-ext');
+// worker.js - Versión Definitiva ES Modules para Wrangler
+import YouTubeExt from 'youtube-ext';
 
 const GOOGLE_HEADERS = {
     'Content-Type': 'application/json',
@@ -26,7 +26,7 @@ function injectExtractorContext(body) {
     return updatedBody;
 }
 
-module.exports = {
+export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
@@ -36,14 +36,12 @@ module.exports = {
             'Access-Control-Allow-Headers': 'Content-Type',
         };
 
-        // Soporte CORS para la app del Galaxy Watch
         if (request.method === 'OPTIONS') {
             return new Response(null, { headers: corsHeaders });
         }
 
         const cleanPath = url.pathname.replace(/\/+/g, '/');
 
-        // Capturamos el body original por si viene con data del reloj
         let reqBody = {};
         const contentType = request.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -99,11 +97,10 @@ module.exports = {
             }
         }
 
-        // 3. Endpoint: NEXT (Videos siguientes / relacionados)
+        // 3. Endpoint: NEXT
         if (cleanPath === '/api/next' || cleanPath === '/next') {
             try {
                 const videoId = url.searchParams.get('videoId') || cleanBody.videoId || '';
-                // Usamos el extractor para traer los detalles del video siguiente
                 const videoDetails = await YouTubeExt.getVideo(videoId);
                 return new Response(JSON.stringify({
                     success: true,
