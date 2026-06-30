@@ -7,20 +7,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Control base
-app.get('/', (req, res) => res.status(200).json({ status: "ok" }));
-app.get('/api', (req, res) => res.status(200).json({ status: "ok" }));
+// Control base para verificar en la web si el server responde
+app.get('/', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" }));
+app.get('/api', (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" }));
 
-// 1. Endpoint: BROWSE (Pega a los trends de música estables)
+// 1. Endpoint: BROWSE (Corregido usando el método nativo real)
 const handleBrowse = async (req, res) => {
     try {
-        // Obtenemos los videos más populares directamente de la API de YouTube
-        const results = await youTubeSearchApi.GetTrendingVideo();
+        // Usamos GetListByKeyword con una búsqueda genérica potente para armar el inicio
+        const results = await youTubeSearchApi.GetListByKeyword("musica tendencias", false, 15);
         
         const safeContents = (results.items || []).map(v => ({
             id: v.id || '',
             title: v.title || 'Video sin título',
-            author: v.author || 'Canal',
+            author: v.channelTitle || 'Canal',
             thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`
         }));
         
@@ -32,7 +32,7 @@ const handleBrowse = async (req, res) => {
 app.get('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 
-// 2. Endpoint: SEARCH (Búsqueda limpia por Smart TV API)
+// 2. Endpoint: SEARCH
 const handleSearch = async (req, res) => {
     const query = req.query.q || '';
     try {
@@ -53,7 +53,7 @@ const handleSearch = async (req, res) => {
 app.get('/search', handleSearch);
 app.get('/api/search', handleSearch);
 
-// 3. Endpoint: NEXT (Detalles y sugeridos)
+// 3. Endpoint: NEXT
 const handleNext = async (req, res) => {
     const videoId = req.query.videoId || '';
     if (!videoId) return res.status(400).json({ error: "Falta el videoId" });
@@ -75,7 +75,7 @@ const handleNext = async (req, res) => {
             id: videoId,
             author: details.channelTitle || 'Desconocido',
             thumbnails: [{ url: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` }],
-            // Pasamos una URL directa armada usando un formato estándar para el reproductor del reloj
+            // Url armada para que tu reproductor de audio la procese directo
             streams: [{ url: `https://www.youtube.com/watch?v=${videoId}`, mimeType: "audio/mp4" }],
             contents: safeContents
         });
