@@ -1,91 +1,48 @@
 const express = require('express');
 const cors = require('cors');
-const youTubeSearchApi = require('youtube-search-api');
+const axios = require('axios');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Control base
-const handleStatus = (req, res) => res.status(200).json({ status: "ok", message: "Servidor estabilizado, che!" });
+const GOOGLE_API_KEY = "AIzaSyCejfkwwYK5B6yChz2o2PJPf8JoYQGr2JY";
+
+const handleStatus = (req, res) => res.status(200).json({ status: "ok", message: "Servidor de youtube corriendo" });
 app.get('/', handleStatus);
 app.post('/', handleStatus);
 app.get('/api', handleStatus);
 app.post('/api', handleStatus);
 
-// Helper seguro para mapear elementos tanto de videos comunes como de shorts
-const formatGridContents = (items, isShorts = false) => {
-    return (items || [])
-        .filter(v => v && (v.id || v.videoId))
-        .map(v => {
-            const videoId = v.id || v.videoId || '';
-            const titleText = v.title || (isShorts ? 'Short vertical' : 'Video sin título');
-            const channelText = v.channelTitle || v.author || 'Canal';
-            
-            let imgUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-            if (v.thumbnail?.thumbnails?.[0]?.url) {
-                imgUrl = v.thumbnail.thumbnails[0].url;
-            } else if (v.thumbnails?.[0]?.url) {
-                imgUrl = v.thumbnails[0].url;
-            }
-
-            return {
-                richItemRenderer: {
-                    content: {
-                        videoRenderer: {
-                            videoId: videoId,
-                            thumbnail: {
-                                thumbnails: [
-                                    { url: imgUrl, width: 360, height: 202 }
-                                ]
-                            },
-                            title: { runs: [{ text: titleText }] },
-                            longBylineText: { runs: [{ text: channelText }] },
-                            shortBylineText: { runs: [{ text: channelText }] },
-                            lengthText: { runs: [{ text: isShorts ? "Short" : "4:30" }] }
-                        }
-                    }
-                }
-            };
-        });
-};
-
-// 1. Endpoint: BROWSE (Con salvavidas antibloqueo)
 const handleBrowse = async (req, res) => {
     try {
-        let combinedItems = [];
-        const terms = ["musica", "tendencias", "videoclips", "songs"];
+        const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&chart=mostPopular&regionCode=AR&maxResults=20&key=${GOOGLE_API_KEY}`;
         
-        for (const word of terms) {
-            try {
-                const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 20);
-                if (resApi && resApi.items && resApi.items.length > 0) {
-                    combinedItems = combinedItems.concat(resApi.items);
-                }
-            } catch (e) {
-                // Si falla una palabra, sigue a la otra silenciosamente
-            }
-            if (combinedItems.length >= 20) break; 
-        }
+        const response = await axios.get(url);
+        const items = response.data.items || [];
 
-        const contentsArray = formatGridContents(combinedItems, false);
+        const contents = items.map(v => ({
+            richItemRenderer: {
+                content: {
+                    videoRenderer: {
+                        videoId: v.id,
+                        thumbnail: { thumbnails: [{ url: v.snippet?.thumbnails?.medium?.url || v.snippet?.thumbnails?.default?.url, width: 360, height: 202 }] },
+                        title: { runs: [{ text: v.snippet?.title || 'Video sin título' }] },
+                        longBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
+                        shortBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
+                        lengthText: { runs: [{ text: "Video" }] }
+                    }
+                }
+            }
+        }));
 
         return res.status(200).json({
-            contents: {
-                twoColumnBrowseResultsRenderer: {
-                    tabs: [{
-                        tabRenderer: {
-                            content: { 
-                                richGridRenderer: { contents: contentsArray } 
-                            }
-                        }
-                    }]
-                }
-            },
+            contents: { twoColumnBrowseResultsRenderer: { tabs: [{ tabRenderer: { content: { richGridRenderer: { contents } } } }] } },
             success: true
         });
     } catch (error) {
+        console.error("Error en la API de YouTube (Browse):", error.response?.data || error.message);
         return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
 };
@@ -94,43 +51,35 @@ app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
 app.post('/api/browse', handleBrowse);
 
-// 2. Endpoint: SHORTS (A prueba de balas contra el array vacío)
 const handleShorts = async (req, res) => {
     try {
-        let combinedItems = [];
-        // Lista de palabras ultra genéricas que devuelven shorts sí o sí
-        const shortsTerms = ["shorts", "funny shorts", "trending shorts", "viral", "tiktok trend"];
+        const queryReloj = req.query.q || req.body?.query || "shorts virales";
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${encodeURIComponent(queryReloj)}&maxResults=25&key=${GOOGLE_API_KEY}`;
+        
+        const response = await axios.get(url);
+        const items = response.data.items || [];
 
-        for (const word of shortsTerms) {
-            try {
-                const resApi = await youTubeSearchApi.GetListByKeyword(word, false, 20);
-                if (resApi && resApi.items && resApi.items.length > 0) {
-                    combinedItems = combinedItems.concat(resApi.items);
+        const contents = items.map(v => ({
+            richItemRenderer: {
+                content: {
+                    videoRenderer: {
+                        videoId: v.id?.videoId,
+                        thumbnail: { thumbnails: [{ url: v.snippet?.thumbnails?.medium?.url, width: 360, height: 202 }] },
+                        title: { runs: [{ text: v.snippet?.title || 'Short' }] },
+                        longBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
+                        shortBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
+                        lengthText: { runs: [{ text: "Short" }] }
+                    }
                 }
-            } catch (e) {
-                // Salvavidas si YouTube bloquea la query
             }
-            // Cortamos el bucle si ya juntamos una buena cantidad para el reloj
-            if (combinedItems.length >= 20) break;
-        }
-
-        const contentsArray = formatGridContents(combinedItems, true);
+        }));
 
         return res.status(200).json({
-            contents: {
-                twoColumnBrowseResultsRenderer: {
-                    tabs: [{
-                        tabRenderer: {
-                            content: { 
-                                richGridRenderer: { contents: contentsArray } 
-                            }
-                        }
-                    }]
-                }
-            },
+            contents: { twoColumnBrowseResultsRenderer: { tabs: [{ tabRenderer: { content: { richGridRenderer: { contents } } } }] } },
             success: true
         });
     } catch (error) {
+        console.error("Error en la API de YouTube (Shorts):", error.response?.data || error.message);
         return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
 };
@@ -138,69 +87,5 @@ app.get('/shorts', handleShorts);
 app.post('/shorts', handleShorts);
 app.get('/api/shorts', handleShorts);
 app.post('/api/shorts', handleShorts);
-
-// 3. Endpoint: SEARCH
-const handleSearch = async (req, res) => {
-    const query = req.query.q || req.body?.query || 'musica';
-    try {
-        const results = await youTubeSearchApi.GetListByKeyword(query, false, 20);
-        return res.status(200).json({
-            contents: {
-                sectionListRenderer: {
-                    contents: [{
-                        itemSectionRenderer: {
-                            contents: (results.items || []).map(v => ({
-                                videoRenderer: {
-                                    videoId: v.id || v.videoId || '',
-                                    title: { runs: [{ text: v.title || 'Video' }] },
-                                    thumbnail: { thumbnails: [{ url: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg` }] },
-                                    longBylineText: { runs: [{ text: v.channelTitle || 'Canal' }] }
-                                }
-                            }))
-                        }
-                    }]
-                }
-            },
-            success: true
-        });
-    } catch (error) {
-        return res.status(200).json({ contents: { sectionListRenderer: { contents: [] } }, success: true });
-    }
-};
-app.get('/search', handleSearch);
-app.post('/search', handleSearch);
-app.get('/api/search', handleSearch);
-app.post('/api/search', handleSearch);
-
-// 4. Endpoint: NEXT
-const handleNext = async (req, res) => {
-    const videoId = req.query.videoId || req.body?.videoId || '';
-    if (!videoId) return res.status(400).json({ error: "Falta el videoId" });
-
-    try {
-        const details = await youTubeSearchApi.GetVideoDetails(videoId);
-        const suggestions = await youTubeSearchApi.GetSuggestVideo(videoId);
-        return res.status(200).json({
-            success: true,
-            title: details.title || 'Video de YouTube',
-            id: videoId,
-            author: details.channelTitle || 'Desconocido',
-            thumbnails: [{ url: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` }],
-            streams: [{ url: `https://pub-c5e31b5cdafb419a86a69d5d340a9ade.r2.dev/speech_20241229061301297.mp3`, mimeType: "audio/mpeg" }],
-            contents: (suggestions.items || []).map(v => ({
-                id: v.id || v.videoId || '',
-                title: v.title || '',
-                author: v.channelTitle || '',
-                thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://img.youtube.com/vi/${v.id || v.videoId}/mqdefault.jpg`
-            }))
-        });
-    } catch (error) {
-        return res.status(200).json({ success: true, title: "Audio de Respaldo", id: videoId, streams: [], contents: [] });
-    }
-};
-app.get('/next', handleNext);
-app.post('/next', handleNext);
-app.get('/api/next', handleNext);
-app.post('/api/next', handleNext);
 
 module.exports = app;
