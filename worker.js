@@ -31,7 +31,9 @@ const handleBrowse = async (req, res) => {
                         title: { runs: [{ text: v.snippet?.title || 'Video sin título' }] },
                         longBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
                         shortBylineText: { runs: [{ text: v.snippet?.channelTitle || 'Canal' }] },
-                        lengthText: { runs: [{ text: "Video" }] }
+                        lengthText: { runs: [{ text: "Video" }] },
+                        viewCountText: { runs: [{ text: v.statistics?.viewCount ? `${parseInt(v.statistics.viewCount).toLocaleString()} vistas` : "0 vistas" }] },
+                        likeCountText: { runs: [{ text: v.statistics?.likeCount ? `${parseInt(v.statistics.likeCount).toLocaleString()} likes` : "0 likes" }] }
                     }
                 }
             }
@@ -46,6 +48,7 @@ const handleBrowse = async (req, res) => {
         return res.status(200).json({ contents: { twoColumnBrowseResultsRenderer: { tabs: [] } }, success: true });
     }
 };
+
 app.get('/browse', handleBrowse);
 app.post('/browse', handleBrowse);
 app.get('/api/browse', handleBrowse);
